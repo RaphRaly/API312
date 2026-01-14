@@ -30,7 +30,7 @@ public:
   BjtNpnEbersMoll(NodeIndex c, NodeIndex b, NodeIndex e, BjtParams p)
       : nc(c), nb(b), ne(e), par(p) {}
 
-  BjtNpnEbersMoll(const std::string &name, NodeIndex c, NodeIndex b,
+  BjtNpnEbersMoll(const std::string & /*name*/, NodeIndex c, NodeIndex b,
                   NodeIndex e, BjtParams p)
       : nc(c), nb(b), ne(e), par(p) {}
 
@@ -54,7 +54,7 @@ public:
     limitedState.vbc_lim = pnjlim(vbc_new, vbc_old, par.nVt, vcrit);
   }
 
-  void stamp(StampContext &) const override {}
+  void stamp(StampContext & /*ctx*/) const override {}
 
   void getDcConnections(
       std::vector<std::pair<int, int>> &connections) const override {
@@ -63,7 +63,7 @@ public:
   }
 
   void stampNewton(StampContext &ctx,
-                   const std::vector<double> &) const override {
+                   const std::vector<double> & /*xGuess*/) const override {
     const double Vbe = limitedState.vbe_lim;
     const double Vbc = limitedState.vbc_lim;
 
@@ -105,9 +105,6 @@ public:
     const double dIe_dVe = -(dIc_dVe + dIb_dVe);
 
     // RHS = J*V_op - I_op
-    const double J_V_Ic =
-        dIc_dVb * Vbe +
-        dIc_dVc * (Vbe - Vbc); // Wait, Vc = Vb - Vbc, Ve = Vb - Vbe
     // Better: J*V = dI/dVbe * Vbe + dI/dVbc * Vbc
     const double JV_Ic = (g_tran_f)*Vbe + (-g_tran_r - g_bc) * Vbc;
     const double JV_Ib = (g_be)*Vbe + (g_bc)*Vbc;
@@ -131,7 +128,7 @@ public:
     stampRow(ne, Ie, dIe_dVc, dIe_dVb, dIe_dVe, JV_Ie);
   }
 
-  void limitUpdate(const std::vector<double> &) override {}
+  void limitUpdate(const std::vector<double> & /*xNew*/) override {}
 
 private:
   int nc, nb, ne;
@@ -147,7 +144,7 @@ public:
   BjtPnpEbersMoll(NodeIndex c, NodeIndex b, NodeIndex e, BjtParams p)
       : nc(c), nb(b), ne(e), par(p) {}
 
-  BjtPnpEbersMoll(const std::string &name, NodeIndex c, NodeIndex b,
+  BjtPnpEbersMoll(const std::string & /*name*/, NodeIndex c, NodeIndex b,
                   NodeIndex e, BjtParams p)
       : nc(c), nb(b), ne(e), par(p) {}
 
@@ -173,7 +170,7 @@ public:
         pnjlim(vcb_new, vcb_old, par.nVt, vcrit); // reusing vbc_lim for vcb
   }
 
-  void stamp(StampContext &) const override {}
+  void stamp(StampContext & /*ctx*/) const override {}
 
   void getDcConnections(
       std::vector<std::pair<int, int>> &connections) const override {
@@ -182,7 +179,7 @@ public:
   }
 
   void stampNewton(StampContext &ctx,
-                   const std::vector<double> &) const override {
+                   const std::vector<double> & /*xGuess*/) const override {
     const double Veb = limitedState.vbe_lim;
     const double Vcb = limitedState.vbc_lim;
 
@@ -244,7 +241,7 @@ public:
     stampRow(nb, Ib, dIb_dVc, dIb_dVb, dIb_dVe, JV_Ib);
   }
 
-  void limitUpdate(const std::vector<double> &) override {}
+  void limitUpdate(const std::vector<double> & /*xNew*/) override {}
 
 private:
   int nc, nb, ne;

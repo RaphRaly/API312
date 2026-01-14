@@ -4,7 +4,7 @@
 
 // Helper function to check transistor operating conditions
 // This is a simplified check - in practice we'd need named nodes
-bool checkTransistorConditions(const std::vector<double> &x, int numNodes) {
+bool checkTransistorConditions(const std::vector<double> &x, int /*numNodes*/) {
   bool all_ok = true;
 
   // Basic sanity checks on all node voltages

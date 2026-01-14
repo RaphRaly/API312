@@ -11,7 +11,7 @@ public:
       throw std::invalid_argument("Resistor: R must be > 0");
   }
 
-  Resistor(const std::string &name, NodeIndex a, NodeIndex b, double R)
+  Resistor(const std::string & /*name*/, NodeIndex a, NodeIndex b, double R)
       : na(a), nb(b), R_(R) {
     if (R_ <= 0.0)
       throw std::invalid_argument("Resistor: R must be > 0");

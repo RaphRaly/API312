@@ -234,9 +234,9 @@ bool test_kcl_conservation() {
   NodeIndex nB = c.createNode();
   NodeIndex nE = c.createNode();
 
-  auto &Vc = c.addElement<VoltageSource>(nC, GND, 5.0);
-  auto &Vb = c.addElement<VoltageSource>(nB, GND, 0.8);
-  auto &Ve = c.addElement<VoltageSource>(nE, GND, 0.0);
+  c.addElement<VoltageSource>(nC, GND, 5.0);
+  c.addElement<VoltageSource>(nB, GND, 0.8);
+  c.addElement<VoltageSource>(nE, GND, 0.0);
 
   BjtParams params;
   params.VAF = 50.0;
@@ -249,23 +249,8 @@ bool test_kcl_conservation() {
     return false;
   }
 
-  // Check KCL at each node
-  // For each node, sum of currents should be 0
-  const int numNodes = c.getNumNodes();
-  const int numBranches = c.getNumBranches();
-
-  for (int node = 0; node < numNodes; ++node) {
-    double current_sum = 0.0;
-
-    // Add currents from branches connected to this node
-    for (int br = 0; br < numBranches; ++br) {
-      // This is simplified - in reality we'd need to know which branches
-      // connect to which nodes. For voltage sources, the branch current
-      // represents current leaving the positive node.
-      // For a full test, we'd need to track element connections.
-    }
-
-    // For now, just check that solution exists and voltages are reasonable
+  // For now, just check that solution exists and voltages are reasonable
+  for (int node = 0; node < c.getNumNodes(); ++node) {
     if (std::abs(x[node]) > 100.0) { // Unreasonable voltage
       std::cout << "Unreasonable voltage at node " << node << ": " << x[node]
                 << std::endl;
@@ -273,7 +258,7 @@ bool test_kcl_conservation() {
     }
   }
 
-  // Check that BJT currents are reasonable
+  // Check that BJT voltages are reasonable
   double Vc_val = x[nC];
   double Vb_val = x[nB];
   double Ve_val = x[nE];

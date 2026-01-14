@@ -8,7 +8,8 @@
 class VoltageSource : public IElement, public IBranchElement {
 public:
   VoltageSource(NodeIndex a, NodeIndex b, double V) : na(a), nb(b), V_(V) {}
-  VoltageSource(const std::string &name, NodeIndex p, NodeIndex n, double V)
+  VoltageSource(const std::string & /*name*/, NodeIndex p, NodeIndex n,
+                double V)
       : na(p), nb(n), V_(V) {}
 
   virtual ~VoltageSource() = default;

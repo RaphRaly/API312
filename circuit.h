@@ -16,12 +16,7 @@
 
 class Circuit {
 public:
-  struct ConvergenceStats {
-    int totalIterations = 0;
-    int sourceStepsReached = 0;
-    double lastResidual = 0.0;
-    bool converged = false;
-  };
+  using ConvergenceStats = ::ConvergenceStats;
   Circuit() = default;
 
   NodeIndex createNode(const std::string &name = "") {
@@ -245,7 +240,7 @@ public:
   }
 
   bool step(double dt, std::vector<double> &x, int maxNewtonIters = 8,
-            double relTol = 1e-6, double absTol = 1e-9) {
+            double /*relTol*/ = 1e-6, double absTol = 1e-9) {
     if (!finalized)
       finalize();
     int N = (int)system.size();
@@ -328,14 +323,13 @@ private:
   double m_gmin = 1e-12;
 
   template <typename T, typename First, typename... Rest>
-  void extractName(T *ptr, First &&first, Rest &&...rest) {
+  void extractName(T *ptr, First &&first, Rest &&.../*rest*/) {
     if constexpr (std::is_convertible<First, std::string>::value) {
       m_elementNames[dynamic_cast<void *>(ptr)] = std::string(first);
     }
   }
-  void extractName(void *ptr) {}
+  void extractName(void * /*ptr*/) {}
   friend class ConnectivityAudit;
 };
 
-// Global compatibility alias
-using ConvergenceStats = Circuit::ConvergenceStats;
+// Global compatibility alias already in mna_types.h

@@ -17,7 +17,6 @@ public:
 
   static void build2520(Circuit &c, double supplyVoltage = 15.0) {
     double vcc_val = std::abs(supplyVoltage);
-    double vee_val = -vcc_val;
     // Nodes
     NodeIndex nVCC = c.createNode("VCC");
     NodeIndex nVEE = c.createNode("VEE");

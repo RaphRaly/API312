@@ -13,7 +13,8 @@ public:
       throw std::invalid_argument("CapacitorTrap: C must be >= 0");
   }
 
-  CapacitorTrap(const std::string &name, NodeIndex a, NodeIndex b, double C)
+  CapacitorTrap(const std::string & /*name*/, NodeIndex a, NodeIndex b,
+                double C)
       : na(a), nb(b), C_(C) {
     if (C_ < 0.0)
       throw std::invalid_argument("CapacitorTrap: C must be >= 0");
@@ -31,11 +32,6 @@ public:
   }
 
   void commitStep(const std::vector<double> &xSolved) override {
-    const double va = nodeVoltage(xSolved, na);
-    const double vb = nodeVoltage(xSolved, nb);
-    const double v = va - nb == GND ? 0 : vb; // Handle GND if nb is GND
-    // wait, nodeVoltage handles GND.
-
     // Correct version using nodeVoltage:
     const double v_new = nodeVoltage(xSolved, na) - nodeVoltage(xSolved, nb);
 
@@ -57,7 +53,7 @@ public:
   }
 
   void getDcConnections(
-      std::vector<std::pair<int, int>> &connections) const override {
+      std::vector<std::pair<int, int>> & /*connections*/) const override {
     // Capacitor is open at DC
   }
 

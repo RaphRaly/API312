@@ -36,9 +36,9 @@ public:
     limitedVd = Va - Vc;
   }
 
-  DiodeShockleyNR(const std::string &name, NodeIndex anode, NodeIndex cathode,
-                  double Is, double n, double Vt = 0.02585, double gmin = 1e-12,
-                  double BV = 0.0, double IBV = 1e-3)
+  DiodeShockleyNR(const std::string & /*name*/, NodeIndex anode,
+                  NodeIndex cathode, double Is, double n, double Vt = 0.02585,
+                  double gmin = 1e-12, double BV = 0.0, double IBV = 1e-3)
       : a(anode), c(cathode), Is_(Is), n_(n), Vt_(Vt), gmin_(gmin), BV_(BV),
         IBV_(IBV) {
     if (Is_ <= 0.0)
@@ -75,7 +75,7 @@ public:
   }
 
   // Nonlinear element does nothing in the pure linear pass.
-  void stamp(StampContext &) const override {}
+  void stamp(StampContext & /*ctx*/) const override {}
 
   void getDcConnections(
       std::vector<std::pair<int, int>> &connections) const override {
@@ -83,7 +83,7 @@ public:
   }
 
   void stampNewton(StampContext &ctx,
-                   const std::vector<double> &xGuess) const override {
+                   const std::vector<double> & /*xGuess*/) const override {
     // Use limited diode voltage for linearization
     const double v = limitedVd;
 
