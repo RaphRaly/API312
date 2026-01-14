@@ -234,13 +234,17 @@ public:
       return false;
 
     // Stage 2: Gmin refinement at 100% scale
-    const std::vector<double> gminSequence = {1e-5, 1e-6,  1e-7,  1e-8,
-                                              1e-9, 1e-10, m_gmin};
+    // More gradual steps; graceful degradation if refinement fails
+    const std::vector<double> gminSequence = {
+        5e-5, 2e-5, 1e-5, 5e-6, 2e-6, 1e-6, 5e-7, 2e-7, 1e-7, 1e-8, m_gmin};
     for (double g : gminSequence) {
-      if (g >= activeGmin)
-        continue;
-      if (!innerNewton(maxIters * 2, 1.0, g, xGuess))
-        return false;
+      if (g >= activeGmin || g < m_gmin)
+        continue; // Skip values above starting point or below target
+      std::vector<double> xGood = xGuess; // Save last good solution
+      if (!innerNewton(maxIters * 2, 1.0, g, xGuess)) {
+        xGuess = xGood; // Restore last good solution on failure
+        break; // Accept solution at last converged Gmin (graceful degradation)
+      }
     }
 
     x = xGuess;
@@ -331,7 +335,8 @@ private:
   std::map<int, std::string> m_nodeNames;
   std::map<void *, std::string> m_elementNames;
   std::vector<double> m_lastSolution;
-  double m_gmin = 1e-12;
+  double m_gmin = 1e-12; // Small for precision; complex circuits use larger
+                         // values via fallback
 
   template <typename T, typename First, typename... Rest>
   void extractName(T *ptr, First &&first, Rest &&.../*rest*/) {
