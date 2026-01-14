@@ -94,7 +94,7 @@ public:
     if (!finalized)
       finalize();
     int N = (int)system.size();
-    if ((int)x.size() != (size_t)N)
+    if ((int)x.size() != N)
       x.assign((std::size_t)N, 0.0);
     std::vector<double> xGuess = x;
 
@@ -106,10 +106,6 @@ public:
         break;
       }
     }
-
-    const std::vector<double> gminSequence = {1e-4, 1e-5, 1e-6,  1e-7,
-                                              1e-8, 1e-9, 1e-10, m_gmin};
-    bool reachedFullScale = false;
 
     auto computeResidualNorm = [&](const std::vector<double> &sol) {
       double sumSq = 0.0;
@@ -193,42 +189,59 @@ public:
       return false;
     };
 
-    // Robust Nested Gmin-Source Homotopy
-    for (double g : gminSequence) {
-      int stepsForThisGmin = reachedFullScale ? 0 : std::max(numSteps, 100);
-      bool gminSuccess = true;
-      for (int s = 0; s <= stepsForThisGmin; ++s) {
-        double scale =
-            (stepsForThisGmin == 0) ? 1.0 : ((double)s / stepsForThisGmin);
-        if (stats)
-          stats->sourceStepsReached = s;
-        if (!innerNewton(maxIters, scale, g, xGuess)) {
-          gminSuccess = false;
-          break;
-        }
-        if (scale >= 1.0)
-          reachedFullScale = true;
-      }
+    // Two-stage Homotopy Strategy:
+    // Stage 1: Reach 100% source scale using a safe activeGmin.
+    // Stage 2: Refine Gmin down to target precision at 100% scale.
 
-      if (reachedFullScale) {
-        // Once we have a 100% scale result, subsequent Gmin levels only need to
-        // solve at 100% scale
-        if (g <= m_gmin) {
-          x = xGuess;
-          m_lastSolution = x;
-          if (stats)
-            stats->converged = true;
-          return true;
-        }
-      } else {
-        // If failed to reach full scale, reset xGuess to cold start for next
-        // Gmin attempt? Actually, keep it but maybe use a higher Gmin for
-        // recovery as we already do in next loop
+    double activeGmin = 1e-4;
+    int rampSteps = std::max(numSteps, 50);
+
+    // Try Stage 1: Source ramp
+    bool rampSuccessful = false;
+    for (int s = 0; s <= rampSteps; ++s) {
+      double scale = (double)s / rampSteps;
+      if (stats)
+        stats->sourceStepsReached = s;
+      if (!innerNewton(maxIters, scale, activeGmin, xGuess)) {
+        // Fallback: try with even higher Gmin
+        activeGmin = 1e-3;
         xGuess.assign((size_t)N, 0.0);
+        bool fallbackSuccess = true;
+        for (int s2 = 0; s2 <= rampSteps; ++s2) {
+          double scale2 = (double)s2 / rampSteps;
+          if (stats)
+            stats->sourceStepsReached = s2;
+          if (!innerNewton(maxIters, scale2, activeGmin, xGuess)) {
+            fallbackSuccess = false;
+            break;
+          }
+        }
+        if (!fallbackSuccess)
+          return false;
+        rampSuccessful = true;
+        break;
       }
+      if (s == rampSteps)
+        rampSuccessful = true;
+    }
+    if (!rampSuccessful)
+      return false;
+
+    // Stage 2: Gmin refinement at 100% scale
+    const std::vector<double> gminSequence = {1e-5, 1e-6,  1e-7,  1e-8,
+                                              1e-9, 1e-10, m_gmin};
+    for (double g : gminSequence) {
+      if (g >= activeGmin)
+        continue;
+      if (!innerNewton(maxIters * 2, 1.0, g, xGuess))
+        return false;
     }
 
-    return false;
+    x = xGuess;
+    m_lastSolution = x;
+    if (stats)
+      stats->converged = true;
+    return true;
   }
 
   bool step(double dt, std::vector<double> &x, int maxNewtonIters = 8,
