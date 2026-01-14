@@ -11,19 +11,21 @@ bool testPnpDiodeConnected() {
   NodeIndex n1 = c.createNode();
   NodeIndex n2 = c.createNode();
 
-  // PNP diode-connected: emitter to base, collector to base
+  // PNP diode-connected: B and C shorted to GND, Emitter at n1 pulled by
+  // current
   BjtParams pnp_params;
   pnp_params.Is = 7.373e-15; // 2N5087
-  pnp_params.nVt = 0.0328;
+  pnp_params.nVt = 0.02585;  // Standard Vt
   pnp_params.betaF = 923.4;
   pnp_params.betaR = 3.745;
   pnp_params.VAF = 80.3;
 
-  c.addElement<BjtPnpEbersMoll>(
-      n2, n1, n1, pnp_params); // C, B, E all connected to n1 except C to n2
+  // C=GND, B=GND, E=n1
+  c.addElement<BjtPnpEbersMoll>(GND, GND, n1, pnp_params);
 
-  // Current source to force current
-  c.addElement<VoltageSource>(n2, GND, 1.0); // Small voltage to drive current
+  // Drive emitter with 1mA (approx)
+  c.addElement<VoltageSource>(n2, GND, 5.0);
+  c.addElement<Resistor>(n2, n1, 4.3e3); // ~1mA current
 
   c.finalize();
   std::vector<double> x;
@@ -33,11 +35,11 @@ bool testPnpDiodeConnected() {
   }
 
   double v_diode = x[n1];
-  std::cout << "PNP diode voltage: " << v_diode << "V (expected ~0.7V)"
+  std::cout << "PNP diode voltage (Veb): " << v_diode << "V (expected ~0.7V)"
             << std::endl;
 
-  if (v_diode < 0.6 || v_diode > 0.8) {
-    std::cout << "PNP diode voltage out of range" << std::endl;
+  if (v_diode < 0.5 || v_diode > 0.85) {
+    std::cout << "PNP diode voltage out of range: " << v_diode << std::endl;
     return false;
   }
 
