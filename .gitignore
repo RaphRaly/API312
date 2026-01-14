@@ -13,7 +13,9 @@ mc_test
 *.out
 *.exe
 *.app
-*.txt
+test_log.txt
+test_out.txt
+build_error.txt
 
 # Debug Symbols
 *.dSYM/
