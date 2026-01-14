@@ -3,7 +3,7 @@
 #include <vector>
 
 using NodeIndex = int;
-static constexpr NodeIndex GND = -1;
+inline constexpr NodeIndex GND = -1;
 
 struct ConvergenceStats {
   int totalIterations = 0;

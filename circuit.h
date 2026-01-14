@@ -93,6 +93,10 @@ public:
       x.assign((std::size_t)N, 0.0);
     std::vector<double> xGuess = x;
 
+    // Global iteration cap to prevent infinite loops (CI safety)
+    constexpr int GLOBAL_ITER_CAP = 10000;
+    int globalIterCount = 0;
+
     // Find OUT node for soft stabilization
     NodeIndex outNodeIdx = -1;
     for (const auto &pair : m_nodeNames) {
@@ -118,6 +122,13 @@ public:
                            std::vector<double> &guess) {
       const int actualMaxIters = std::max(iters, 300);
       for (int k = 0; k < actualMaxIters; ++k) {
+        // Check global iteration cap
+        if (++globalIterCount > GLOBAL_ITER_CAP) {
+          if (verbose)
+            std::cout << "[DC] Global iteration cap (" << GLOBAL_ITER_CAP
+                      << ") exceeded" << std::endl;
+          return false;
+        }
         if (stats)
           stats->totalIterations++;
         system.clear();
