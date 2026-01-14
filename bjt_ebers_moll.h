@@ -70,14 +70,25 @@ public:
     const double expBE = safeExp(Vbe / par.nVt);
     const double expBC = safeExp(Vbc / par.nVt);
 
-    // Currents
+    // Currents (without Early effect first)
     const double I_tran = par.Is * (expBE - expBC);
     const double I_be_diode =
         (par.Is / par.betaF) * (expBE - 1.0) + par.gmin * Vbe;
     const double I_bc_diode =
         (par.Is / par.betaR) * (expBC - 1.0) + par.gmin * Vbc;
 
-    const double Ic = I_tran - I_bc_diode;
+    // Vce for Early effect (Vce = Vbe - Vbc)
+    const double Vce = Vbe - Vbc;
+
+    // Base collector current without Early
+    const double Ic_base = I_tran - I_bc_diode;
+
+    // Early effect: output conductance go = |Ic|/VAF
+    // Ic_total = Ic_base * (1 + Vce/VAF) ≈ Ic_base + Ic_base*Vce/VAF
+    // For small-signal: go = dIc/dVce = |Ic_base|/VAF
+    const double go = (par.VAF > 0.0) ? std::abs(Ic_base) / par.VAF : 0.0;
+    const double Ic = Ic_base + go * Vce;
+
     const double Ib = I_be_diode + I_bc_diode;
     const double Ie = -(Ic + Ib);
 
@@ -88,26 +99,27 @@ public:
     const double g_bc = (par.Is / (par.betaR * par.nVt)) * expBC + par.gmin;
 
     // Jacobian dI/dVnode
-    // Vbe = Vb - Ve, Vbc = Vb - Vc
-    // Ic row
+    // Vbe = Vb - Ve, Vbc = Vb - Vc, Vce = Vc - Ve (but Vce = Vbe - Vbc)
+    // dVce/dVc = +1, dVce/dVe = -1, dVce/dVb = 0
+    // Ic row (including Early effect: go contributes to dIc/dVc and dIc/dVe)
     const double dIc_dVb = g_tran_f - g_tran_r - g_bc;
-    const double dIc_dVc = g_tran_r + g_bc;
-    const double dIc_dVe = -g_tran_f;
+    const double dIc_dVc = g_tran_r + g_bc + go; // +go from dVce/dVc = +1
+    const double dIc_dVe = -g_tran_f - go;       // -go from dVce/dVe = -1
 
-    // Ib row
+    // Ib row (no Early effect on base current)
     const double dIb_dVb = g_be + g_bc;
     const double dIb_dVc = -g_bc;
     const double dIb_dVe = -g_be;
 
-    // Ie row
+    // Ie row (derived from Ie = -(Ic + Ib))
     const double dIe_dVb = -(dIc_dVb + dIb_dVb);
     const double dIe_dVc = -(dIc_dVc + dIb_dVc);
     const double dIe_dVe = -(dIc_dVe + dIb_dVe);
 
     // RHS = J*V_op - I_op
-    // Better: J*V = dI/dVbe * Vbe + dI/dVbc * Vbc
-    const double JV_Ic = (g_tran_f)*Vbe + (-g_tran_r - g_bc) * Vbc;
-    const double JV_Ib = (g_be)*Vbe + (g_bc)*Vbc;
+    // JV_Ic includes Early effect contribution: go*Vce
+    const double JV_Ic = g_tran_f * Vbe + (-g_tran_r - g_bc) * Vbc + go * Vce;
+    const double JV_Ib = g_be * Vbe + g_bc * Vbc;
     const double JV_Ie = -(JV_Ic + JV_Ib);
 
     auto stampRow = [&](int row, double I_op, double d_dVc, double d_dVb,
@@ -192,9 +204,21 @@ public:
     const double I_cb_diode =
         (par.Is / par.betaR) * (expCB - 1.0) + par.gmin * Vcb;
 
+    // Vec for Early effect (Vec = Veb - Vcb = Ve - Vc, which is -Vce for PNP)
+    const double Vec = Veb - Vcb;
+
+    // Base collector current without Early
+    // For PNP: Ic flows INTO collector (opposite convention)
+    const double Ic_base = -I_tran + I_cb_diode;
+
+    // Early effect: output conductance go = |Ic|/VAF
+    // For PNP, the collector current increases with more negative Vce (more
+    // positive Vec)
+    const double go = (par.VAF > 0.0) ? std::abs(Ic_base) / par.VAF : 0.0;
+    const double Ic = Ic_base + go * Vec;
+
     // Currents entering terminals
     const double Ie = I_tran + I_eb_diode;
-    const double Ic = -I_tran + I_cb_diode;
     const double Ib = -(Ie + Ic);
 
     const double g_tran_f = (par.Is / par.nVt) * expEB;
@@ -203,24 +227,26 @@ public:
     const double g_cb = (par.Is / (par.betaR * par.nVt)) * expCB + par.gmin;
 
     // dI/dVnode
-    // Veb = Ve - Vb, Vcb = Vc - Vb
-    // Ie row
+    // Veb = Ve - Vb, Vcb = Vc - Vb, Vec = Ve - Vc
+    // dVec/dVe = +1, dVec/dVc = -1, dVec/dVb = 0
+    // Ie row (no Early effect on emitter current in this formulation)
     const double dIe_dVe = g_tran_f + g_eb;
     const double dIe_dVc = -g_tran_r;
     const double dIe_dVb = -(g_tran_f + g_eb - g_tran_r);
 
-    // Ic row
-    const double dIc_dVe = -g_tran_f;
-    const double dIc_dVc = g_tran_r + g_cb;
+    // Ic row (including Early effect: go contributes based on Vec)
+    const double dIc_dVe = -g_tran_f + go;       // +go from dVec/dVe = +1
+    const double dIc_dVc = g_tran_r + g_cb - go; // -go from dVec/dVc = -1
     const double dIc_dVb = g_tran_f - (g_tran_r + g_cb);
 
-    // Ib row
+    // Ib row (derived from Ib = -(Ie + Ic))
     const double dIb_dVe = -(dIe_dVe + dIc_dVe);
     const double dIb_dVc = -(dIe_dVc + dIc_dVc);
     const double dIb_dVb = -(dIe_dVb + dIc_dVb);
 
+    // RHS contributions (JV = J * V_op)
     const double JV_Ie = (g_tran_f + g_eb) * Veb + (-g_tran_r) * Vcb;
-    const double JV_Ic = (-g_tran_f) * Veb + (g_tran_r + g_cb) * Vcb;
+    const double JV_Ic = (-g_tran_f) * Veb + (g_tran_r + g_cb) * Vcb + go * Vec;
     const double JV_Ib = -(JV_Ie + JV_Ic);
 
     auto stampRow = [&](int row, double I_op, double d_dVc, double d_dVb,
