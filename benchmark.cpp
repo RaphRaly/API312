@@ -23,7 +23,6 @@ int main() {
 
   int steps = 1000;
   double dt = 2.0e-6;
-  int totalNewtonIters = 0;
 
   for (int i = 0; i < steps; ++i) {
     // Run with fixed iter count for benchmark consistency
