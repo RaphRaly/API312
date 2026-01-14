@@ -1,0 +1,69 @@
+# 2520 Operational Amplifier Netlist
+# Format: COMPONENT_TYPE node1 node2 node3 value_or_model
+# GND = 0, VCC = supply+, VEE = supply-
+#
+# This is a TEMPLATE - Replace with actual schematic connections
+# Once you have the real schematic, replace this with exact topology
+
+# Power supplies
+V_VCC VCC 0 DC 15
+V_VEE 0 VEE DC 15
+
+# Input signals (for testing)
+V_INP INP 0 DC 0
+V_INM INM 0 DC 0
+
+# Differential input stage
+Q_Q1 C1 INP TAIL BC414C
+Q_Q2 C2 INM TAIL BC414C
+
+# Current source for input stage
+I_TAIL 0 TAIL DC 0.5m
+
+# Active load
+Q_Q3 C3 B3 TAIL TIS98
+
+# Bias resistors
+R_R1 C1 B3 10k
+R_R2 VCC C1 5k
+R_R3 VCC C2 5k
+
+# Voltage gain stage
+Q_Q4 C4 B4 0 TIS98
+Q_Q5 C5 B5 0 TIS98
+
+# Inter-stage connections
+R_R6 C3 B4 1k
+R_R7 0 B5 1k
+
+# Output stage
+Q_Q6 C6 B6 VCC 2N5087
+Q_Q7 C7 B7 0 2N3053
+Q_Q8 C8 B8 VCC 2N4036
+Q_Q9 0 B9 VEE 2N5087
+
+# Output connections
+R_R8 C7 OUT 100
+R_R9 C6 OUT 100
+
+# Bias network
+R_R10 VCC B6 10k
+R_R11 0 B7 10k
+R_R12 VCC B8 10k
+R_R13 C5 B9 10k
+
+# Protection diodes
+D_D2 OUT VCC 1N22361
+D_D3 VEE OUT 1N22361
+
+# Compensation capacitors (add after DC convergence)
+# C_C2 C2 B4 30p
+# C_C3 B4 0 30p
+# C_C5 C5 OUT 10p
+
+# Notes:
+# - Node names should match schematic exactly
+# - All component values from schematic
+# - Diodes D2/D3 protect output from supply reversal
+# - Compensation capacitors added after DC testing
+# - Current source I_TAIL provides tail current for diff pair

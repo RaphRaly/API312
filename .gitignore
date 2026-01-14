@@ -1,0 +1,22 @@
+# Binaries
+main
+*.out
+*.app
+
+# Objects and Libraries
+*.o
+*.a
+*.so
+*.dylib
+
+# IDEs
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+
+# Brain/Artifacts (If you want to keep them out of project git)
+#.gemini/
