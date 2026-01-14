@@ -12,30 +12,10 @@ else()
     add_compile_options(-Wall -Wextra -Wpedantic)
 endif()
 
-# Create library
-add_library(mna_lib STATIC
-    resistor.h
-    capacitor_trap.h
-    inductor.h
-    voltage_source.h
-    current_source.h
-    diode_shockley_nr.h
-    bjt_ebers_moll.h
-    elements.h
-    mna_types.h
-    linear_system.h
-    gaussian_solver.h
-    linear_solver.h
-    stamping.h
-    utils.h
-    circuit.h
-    spice_models_2520.h
-    api_2520_builder.h
-    plausibility.h
-)
-
-# Make headers available
-target_include_directories(mna_lib PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
+# Create interface library (header-only)
+add_library(mna_lib INTERFACE)
+target_include_directories(mna_lib INTERFACE ${CMAKE_CURRENT_SOURCE_DIR})
+# Explicitly list headers for IDE visibility if needed, but not as part of add_library source list for INTERFACE
 
 # Main executable
 add_executable(mna_simulator main.cpp)
@@ -63,6 +43,9 @@ target_link_libraries(mna_tests_bjt_extended PRIVATE mna_lib)
 add_executable(sweep_supplies sweep_supplies.cpp)
 target_link_libraries(sweep_supplies PRIVATE mna_lib)
 
+add_executable(benchmark benchmark.cpp)
+target_link_libraries(benchmark PRIVATE mna_lib)
+
 # Add tests
 add_test(NAME circuit_tests COMMAND mna_tests)
 add_test(NAME golden_tests COMMAND mna_tests_golden)
@@ -70,3 +53,4 @@ add_test(NAME pnp_diode_tests COMMAND mna_tests_pnp_diode)
 add_test(NAME bjt_extended_tests COMMAND mna_tests_bjt_extended)
 add_test(NAME 2520_tests COMMAND mna_tests_2520)
 add_test(NAME supply_sweep COMMAND sweep_supplies)
+add_test(NAME performance_benchmark COMMAND benchmark)

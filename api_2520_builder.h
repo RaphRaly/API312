@@ -24,6 +24,7 @@ public:
     NodeIndex nGND = GND;
     NodeIndex nINP = c.createNode("INP");
     NodeIndex nINM = c.createNode("INM");
+    NodeIndex nINM_Ref = c.createNode("INM_Ref"); // Stabilized reference node
     NodeIndex nOUT = c.createNode("OUT");
     NodeIndex nTAIL = c.createNode("Diff_Tail");
     NodeIndex nC1 = c.createNode("Q1_Col");
@@ -46,11 +47,14 @@ public:
     c.addElement<VoltageSource>("Vcc_Src", nVCC, nGND, vcc_val);
     c.addElement<VoltageSource>("Vee_Src", nGND, nVEE, vcc_val);
     vinP_ref = &c.addElement<VoltageSource>("VinP", nINP, nGND, 0.0);
+    vinM_ref = &c.addElement<VoltageSource>("VinM", nINM_Ref, nGND, 0.0);
     out_node = nOUT;
 
     // ----- FEEDBACK (Gain = 2) -----
+    // Connecting R_Input to nINM_Ref (VinM) ensures closed-loop stability in DC
+    // tests
     c.addElement<Resistor>("R_Feedback", nOUT, nINM, 10000.0);
-    c.addElement<Resistor>("R_Input", nINM, nGND, 10000.0);
+    c.addElement<Resistor>("R_Input", nINM, nINM_Ref, 10000.0);
 
     // ----- SIGNAL MIRROR (Active Load) -----
     auto q_pnp = spiceToBjtParams(getSpiceBjtModel("BC416C"));
@@ -106,9 +110,11 @@ public:
   }
 
   static VoltageSource *getVinP() { return vinP_ref; }
+  static VoltageSource *getVinM() { return vinM_ref; }
   static NodeIndex getOutputNode() { return out_node; }
 
 private:
   static inline VoltageSource *vinP_ref = nullptr;
+  static inline VoltageSource *vinM_ref = nullptr;
   static inline NodeIndex out_node = -1;
 };

@@ -1,18 +1,19 @@
 # Binaries
 main
 audit_2520
+mna_tests
+mna_tests_golden
+mna_tests_pnp_diode
+mna_tests_bjt_extended
 mna_tests_2520
-run_diagnostics
-test_bjt_mna
-test_diagnostics
-test_minimal_bjt
-test_vsource_mna
+mna_simulator
 benchmark
 sweep_supplies
 mc_test
 *.out
 *.exe
 *.app
+*.txt
 
 # Debug Symbols
 *.dSYM/

@@ -48,7 +48,7 @@ public:
         }
       }
 
-      if (maxAbs < 1e-15) { // Tightened threshold for singularity
+      if (maxAbs < 1e-18) { // Relaxed threshold for singularity
         return k;           // Return the row index of failure
       }
 

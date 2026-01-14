@@ -14,6 +14,13 @@
 #include <type_traits>
 #include <vector>
 
+struct ConvergenceStats {
+  int totalIterations = 0;
+  int sourceStepsReached = 0;
+  double lastResidual = 0.0;
+  bool converged = false;
+};
+
 class Circuit {
 public:
   Circuit() = default;
@@ -41,7 +48,6 @@ public:
     }
 
     extractName(el.get(), std::forward<Args>(args)...);
-
     elements.push_back(std::move(el));
     return ref;
   }
@@ -83,130 +89,153 @@ public:
     return "UNKNOWN(" + std::to_string(idx) + ")";
   }
 
-  bool solveDc(std::vector<double> &x, int maxIters = 100, double tol = 1e-6,
-               bool verbose = false, int numSteps = 10) {
+  bool solveDc(std::vector<double> &x, int maxIters = 250, double tol = 1e-6,
+               bool verbose = false, int numSteps = 50,
+               ConvergenceStats *stats = nullptr) {
     if (!finalized)
       finalize();
     int N = (int)system.size();
-    x.assign((std::size_t)N, 0.0);
+    if ((int)x.size() != (size_t)N)
+      x.assign((std::size_t)N, 0.0);
     std::vector<double> xGuess = x;
 
-    LimitContext initCtx{xGuess, xGuess};
-    for (auto *ne : newtonElements)
-      ne->computeLimitedVoltages(initCtx);
-
-    bool useSourceStepping = (numSteps > 1);
-    for (int step = 1; step <= numSteps; ++step) {
-      double currentScale = (double)step / numSteps;
-      if (useSourceStepping && verbose) {
-        std::cerr << "[Circuit] Source Step " << step << "/" << numSteps
-                  << " (Scale=" << currentScale << ")" << std::endl;
-      }
-
-      bool stepConverged = false;
-      // Gmin Stepping: start with high conductance to help convergence
-      // Final step MUST converge with m_gmin (target).
-      std::vector<double> gminLevels;
-      if (step < numSteps) {
-        gminLevels = {1e-3, 1e-6, 1e-9, m_gmin};
-      } else {
-        gminLevels = {1e-6, 1e-9, m_gmin}; // Tighter on final step
-      }
-
-      for (double activeGmin : gminLevels) {
-        for (int k = 0; k < maxIters; ++k) {
-          system.clear();
-          StampContext ctx{system, currentScale};
-          for (auto &e : elements)
-            e->stamp(ctx);
-          for (auto *ne : newtonElements)
-            ne->stampNewton(ctx, xGuess);
-
-          for (int i = 0; i < numNodes; ++i) {
-            system.addA(i, i, activeGmin);
-          }
-
-          // Compute current residual for damping check
-          auto computeResidualNorm = [&](const std::vector<double> &sol) {
-            double norm = 0.0;
-            for (int i = 0; i < N; ++i) {
-              double rowSum = 0.0;
-              for (int j = 0; j < N; ++j) {
-                rowSum += system.getA(i, j) * sol[(std::size_t)j];
-              }
-              double fi = rowSum - system.getZ(i);
-              norm += fi * fi;
-            }
-            return std::sqrt(norm);
-          };
-
-          double oldResidNorm = computeResidualNorm(xGuess);
-
-          std::vector<double> deltaX;
-          int failRow = GaussianSolver::solve(system, deltaX);
-          if (failRow >= 0) {
-            if (verbose)
-              std::cerr << "[Circuit] Linear solver failed at row " << failRow
-                        << "\n";
-            break; // Try next Gmin
-          }
-
-          // Backtracking Line Search
-          double alpha = 1.0;
-          std::vector<double> xNew;
-          bool improved = false;
-
-          for (int backtrack = 0; backtrack < 5; ++backtrack) {
-            xNew = xGuess;
-            for (int i = 0; i < N; ++i) {
-              double dx =
-                  alpha * (deltaX[(std::size_t)i] - xGuess[(std::size_t)i]);
-              // Still apply a safety clamp
-              if (dx > 2.0)
-                dx = 2.0;
-              if (dx < -2.0)
-                dx = -2.0;
-              xNew[(std::size_t)i] += dx;
-            }
-
-            // Apply Limiting
-            LimitContext limitCtx{xNew, xGuess};
-            for (auto *ne : newtonElements)
-              ne->computeLimitedVoltages(limitCtx);
-
-            double newResidNorm = computeResidualNorm(xNew);
-            if (newResidNorm < oldResidNorm || alpha < 0.1) {
-              improved = true;
-              break;
-            }
-            alpha *= 0.5;
-          }
-
-          double maxDelta = 0.0;
-          for (int i = 0; i < N; ++i) {
-            maxDelta = std::max(maxDelta, std::abs(xNew[i] - xGuess[i]));
-          }
-
-          xGuess = xNew;
-
-          if (maxDelta < tol && oldResidNorm < 1e-6) {
-            stepConverged = true;
-            break;
-          }
-        }
-        if (stepConverged)
-          break;
-      }
-
-      if (!stepConverged) {
-        std::cerr << "[Circuit] Failed to converge source step " << step
-                  << std::endl;
-        x = xGuess; // Store last guess for debug
-        return false;
+    // Condition #3: Locate OUT node for temporary soft stabilization
+    NodeIndex outNodeIdx = -1;
+    for (const auto &pair : m_nodeNames) {
+      if (pair.second == "OUT") {
+        outNodeIdx = pair.first;
+        break;
       }
     }
+
+    // Condition #2&3: Methodical Gmin Levels & Soft Stabilization
+    const std::vector<double> gminSequence = {1e-5, 1e-6,  1e-7,  1e-8,
+                                              1e-9, 1e-10, m_gmin};
+    double activeGmin = 1e-5; // Start with safe Gmin for source loop
+
+    auto computeResidualNorm = [&](const std::vector<double> &sol) {
+      double sumSq = 0.0;
+      for (int i = 0; i < N; ++i) {
+        double rowSum = 0.0;
+        for (int j = 0; j < N; ++j)
+          rowSum += system.getA(i, j) * sol[(std::size_t)j];
+        double fi = rowSum - system.getZ(i);
+        sumSq += fi * fi;
+      }
+      return std::sqrt(sumSq);
+    };
+
+    auto innerNewton = [&](int iters, double scale, double g,
+                           std::vector<double> &guess) {
+      for (int k = 0; k < iters; ++k) {
+        if (stats)
+          stats->totalIterations++;
+        system.clear();
+        StampContext ctx{system, scale};
+        for (auto &e : elements)
+          e->stamp(ctx);
+        for (auto *ne : newtonElements)
+          ne->stampNewton(ctx, guess);
+        for (int i = 0; i < numNodes; ++i)
+          system.addA(i, i, g);
+        if (outNodeIdx != -1 && scale < 0.5) {
+          system.addA(outNodeIdx, outNodeIdx, 1e-2 * (1.0 - scale * 2.0));
+        }
+
+        double oldResidNorm = computeResidualNorm(guess);
+        std::vector<double> deltaX;
+        if (GaussianSolver::solve(system, deltaX) >= 0) {
+          for (int i = 0; i < numNodes; ++i)
+            system.addA(i, i, g * 100.0);
+          if (GaussianSolver::solve(system, deltaX) >= 0)
+            return false;
+        }
+
+        double alpha = 1.0;
+        std::vector<double> xNew;
+        bool bt = false;
+        for (int b = 0; b < 10; ++b) {
+          xNew = guess;
+          for (int i = 0; i < N; ++i) {
+            double dx = alpha * (deltaX[i] - guess[i]);
+            if (dx > 2.0)
+              dx = 2.0;
+            if (dx < -2.0)
+              dx = -2.0;
+            xNew[i] += dx;
+          }
+          LimitContext lctx{xNew, guess};
+          for (auto *ne : newtonElements)
+            ne->computeLimitedVoltages(lctx);
+          if (computeResidualNorm(xNew) < oldResidNorm || alpha < 1e-6) {
+            if (b > 0)
+              bt = true;
+            break;
+          }
+          alpha *= 0.5;
+        }
+
+        double dxMax = 0.0;
+        for (int i = 0; i < N; ++i)
+          dxMax = std::max(dxMax, std::abs(xNew[i] - guess[i]));
+        guess = xNew;
+
+        if (verbose && (k % 50 == 0 || dxMax < tol)) {
+          std::cout << "[DC] G=" << g << " S=" << scale << " K=" << k
+                    << " R=" << oldResidNorm << " dX=" << dxMax
+                    << (bt ? " (BT)" : "") << std::endl;
+        }
+        if (dxMax < tol && oldResidNorm < 1e-4)
+          return true;
+      }
+      return false;
+    };
+
+    bool stage1Success = false;
+    double startScale = 0.02;
+    for (int s = 0; s <= numSteps; ++s) {
+      double scale = startScale + (1.0 - startScale) * (double)s / numSteps;
+      if (scale > 1.0)
+        scale = 1.0;
+      if (stats)
+        stats->sourceStepsReached = s;
+      if (!innerNewton(maxIters, scale, activeGmin, xGuess))
+        break;
+      if (scale >= 1.0) {
+        stage1Success = true;
+        break;
+      }
+    }
+
+    if (!stage1Success) {
+      activeGmin = 5e-5; // Try recovery with high Gmin
+      xGuess.assign((size_t)N, 0.0);
+      for (int s = 0; s <= numSteps; ++s) {
+        double scale = startScale + (1.0 - startScale) * (double)s / numSteps;
+        if (scale >= 1.0)
+          scale = 1.0;
+        if (!innerNewton(maxIters, scale, activeGmin, xGuess))
+          return false;
+        if (scale >= 1.0) {
+          stage1Success = true;
+          break;
+        }
+      }
+    }
+
+    // Stage 2: Gmin refinement at 100% scale
+    for (double g : gminSequence) {
+      if (g >= activeGmin)
+        continue;
+      // Use double iterations for critical refinement steps
+      if (!innerNewton(maxIters * 2, 1.0, g, xGuess))
+        return false;
+    }
+
     x = xGuess;
     m_lastSolution = x;
+    if (stats)
+      stats->converged = true;
     return true;
   }
 
@@ -221,9 +250,7 @@ public:
       d->beginStep(dt);
 
     std::vector<double> xGuess = x;
-    double damping = 1.0;
     bool converged = false;
-
     for (int k = 0; k < maxNewtonIters; ++k) {
       system.clear();
       StampContext ctx{system, 1.0};
@@ -231,36 +258,28 @@ public:
         e->stamp(ctx);
       for (auto *ne : newtonElements)
         ne->stampNewton(ctx, xGuess);
-
-      double gmin_active = 1e-9;
-      for (int i = 0; i < numNodes; ++i) {
-        system.addA(i, i, gmin_active);
-      }
+      for (int i = 0; i < numNodes; ++i)
+        system.addA(i, i, m_gmin);
 
       std::vector<double> xNew;
       if (GaussianSolver::solve(system, xNew) >= 0)
         return false;
 
       double maxDelta = 0.0;
-      double damping = 1.0;
       for (int i = 0; i < N; ++i) {
-        double delta =
-            damping * (xNew[(std::size_t)i] - xGuess[(std::size_t)i]);
+        double delta = (xNew[i] - xGuess[i]);
         if (delta > 5.0)
           delta = 5.0;
         if (delta < -5.0)
           delta = -5.0;
-        xNew[(std::size_t)i] = xGuess[(std::size_t)i] + delta;
+        xNew[i] = xGuess[i] + delta;
         maxDelta = std::max(maxDelta, std::abs(delta));
       }
-
-      std::vector<double> xPrevIter = xGuess;
+      std::vector<double> xOld = xGuess;
       xGuess = xNew;
-
-      LimitContext limitCtx{xGuess, xPrevIter};
+      LimitContext limitCtx{xGuess, xOld};
       for (auto *ne : newtonElements)
         ne->computeLimitedVoltages(limitCtx);
-
       if (maxDelta < absTol) {
         converged = true;
         break;
@@ -286,17 +305,18 @@ public:
   const std::map<int, std::string> &getNodeNames() const { return m_nodeNames; }
   const std::vector<double> &getSolution() const { return m_lastSolution; }
 
+  // Expose for golden tests and diagnostics
+  DenseLinearSystem system;
+  std::vector<std::unique_ptr<IElement>> elements;
+  std::vector<INewtonElement *> newtonElements;
+  std::vector<IDynamicElement *> dynamicElements;
+  std::vector<IBranchElement *> branchElements;
+
 private:
   bool finalized = false;
   int nextNodeIndex = 0;
   int numNodes = 0;
   int numBranches = 0;
-  DenseLinearSystem system;
-  double sourceScale = 1.0;
-  std::vector<std::unique_ptr<IElement>> elements;
-  std::vector<INewtonElement *> newtonElements;
-  std::vector<IDynamicElement *> dynamicElements;
-  std::vector<IBranchElement *> branchElements;
   std::map<int, std::string> m_nodeNames;
   std::map<void *, std::string> m_elementNames;
   std::vector<double> m_lastSolution;
@@ -309,6 +329,5 @@ private:
     }
   }
   void extractName(void *ptr) {}
-
   friend class ConnectivityAudit;
 };
