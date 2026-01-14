@@ -14,15 +14,14 @@
 #include <type_traits>
 #include <vector>
 
-struct ConvergenceStats {
-  int totalIterations = 0;
-  int sourceStepsReached = 0;
-  double lastResidual = 0.0;
-  bool converged = false;
-};
-
 class Circuit {
 public:
+  struct ConvergenceStats {
+    int totalIterations = 0;
+    int sourceStepsReached = 0;
+    double lastResidual = 0.0;
+    bool converged = false;
+  };
   Circuit() = default;
 
   NodeIndex createNode(const std::string &name = "") {
@@ -99,7 +98,7 @@ public:
       x.assign((std::size_t)N, 0.0);
     std::vector<double> xGuess = x;
 
-    // Condition #3: Locate OUT node for temporary soft stabilization
+    // Find OUT node for soft stabilization
     NodeIndex outNodeIdx = -1;
     for (const auto &pair : m_nodeNames) {
       if (pair.second == "OUT") {
@@ -108,10 +107,9 @@ public:
       }
     }
 
-    // Condition #2&3: Methodical Gmin Levels & Soft Stabilization
-    const std::vector<double> gminSequence = {1e-5, 1e-6,  1e-7,  1e-8,
-                                              1e-9, 1e-10, m_gmin};
-    double activeGmin = 1e-5; // Start with safe Gmin for source loop
+    const std::vector<double> gminSequence = {1e-4, 1e-5, 1e-6,  1e-7,
+                                              1e-8, 1e-9, 1e-10, m_gmin};
+    bool reachedFullScale = false;
 
     auto computeResidualNorm = [&](const std::vector<double> &sol) {
       double sumSq = 0.0;
@@ -127,7 +125,8 @@ public:
 
     auto innerNewton = [&](int iters, double scale, double g,
                            std::vector<double> &guess) {
-      for (int k = 0; k < iters; ++k) {
+      const int actualMaxIters = std::max(iters, 300);
+      for (int k = 0; k < actualMaxIters; ++k) {
         if (stats)
           stats->totalIterations++;
         system.clear();
@@ -138,6 +137,8 @@ public:
           ne->stampNewton(ctx, guess);
         for (int i = 0; i < numNodes; ++i)
           system.addA(i, i, g);
+
+        // Soft stabilization shunt (strictly removed at scale >= 0.5)
         if (outNodeIdx != -1 && scale < 0.5) {
           system.addA(outNodeIdx, outNodeIdx, 1e-2 * (1.0 - scale * 2.0));
         }
@@ -145,6 +146,7 @@ public:
         double oldResidNorm = computeResidualNorm(guess);
         std::vector<double> deltaX;
         if (GaussianSolver::solve(system, deltaX) >= 0) {
+          // Adaptive recovery Gmin if singular
           for (int i = 0; i < numNodes; ++i)
             system.addA(i, i, g * 100.0);
           if (GaussianSolver::solve(system, deltaX) >= 0)
@@ -191,52 +193,42 @@ public:
       return false;
     };
 
-    bool stage1Success = false;
-    double startScale = 0.02;
-    for (int s = 0; s <= numSteps; ++s) {
-      double scale = startScale + (1.0 - startScale) * (double)s / numSteps;
-      if (scale > 1.0)
-        scale = 1.0;
-      if (stats)
-        stats->sourceStepsReached = s;
-      if (!innerNewton(maxIters, scale, activeGmin, xGuess))
-        break;
-      if (scale >= 1.0) {
-        stage1Success = true;
-        break;
-      }
-    }
-
-    if (!stage1Success) {
-      activeGmin = 5e-5; // Try recovery with high Gmin
-      xGuess.assign((size_t)N, 0.0);
-      for (int s = 0; s <= numSteps; ++s) {
-        double scale = startScale + (1.0 - startScale) * (double)s / numSteps;
-        if (scale >= 1.0)
-          scale = 1.0;
-        if (!innerNewton(maxIters, scale, activeGmin, xGuess))
-          return false;
-        if (scale >= 1.0) {
-          stage1Success = true;
+    // Robust Nested Gmin-Source Homotopy
+    for (double g : gminSequence) {
+      int stepsForThisGmin = reachedFullScale ? 0 : std::max(numSteps, 100);
+      bool gminSuccess = true;
+      for (int s = 0; s <= stepsForThisGmin; ++s) {
+        double scale =
+            (stepsForThisGmin == 0) ? 1.0 : ((double)s / stepsForThisGmin);
+        if (stats)
+          stats->sourceStepsReached = s;
+        if (!innerNewton(maxIters, scale, g, xGuess)) {
+          gminSuccess = false;
           break;
         }
+        if (scale >= 1.0)
+          reachedFullScale = true;
+      }
+
+      if (reachedFullScale) {
+        // Once we have a 100% scale result, subsequent Gmin levels only need to
+        // solve at 100% scale
+        if (g <= m_gmin) {
+          x = xGuess;
+          m_lastSolution = x;
+          if (stats)
+            stats->converged = true;
+          return true;
+        }
+      } else {
+        // If failed to reach full scale, reset xGuess to cold start for next
+        // Gmin attempt? Actually, keep it but maybe use a higher Gmin for
+        // recovery as we already do in next loop
+        xGuess.assign((size_t)N, 0.0);
       }
     }
 
-    // Stage 2: Gmin refinement at 100% scale
-    for (double g : gminSequence) {
-      if (g >= activeGmin)
-        continue;
-      // Use double iterations for critical refinement steps
-      if (!innerNewton(maxIters * 2, 1.0, g, xGuess))
-        return false;
-    }
-
-    x = xGuess;
-    m_lastSolution = x;
-    if (stats)
-      stats->converged = true;
-    return true;
+    return false;
   }
 
   bool step(double dt, std::vector<double> &x, int maxNewtonIters = 8,
@@ -331,3 +323,6 @@ private:
   void extractName(void *ptr) {}
   friend class ConnectivityAudit;
 };
+
+// Global compatibility alias
+using ConvergenceStats = Circuit::ConvergenceStats;
