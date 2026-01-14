@@ -9,7 +9,6 @@
 #include "voltage_source.h"
 #include <iostream>
 
-
 // API 2520 Builder - Step D: Final Fine-Tuning & Parasitics
 class Api2520Builder {
 public:
@@ -64,13 +63,8 @@ public:
 
     // ----- INPUT STAGE (with Degeneration) -----
     auto q_npn = spiceToBjtParams(getSpiceBjtModel("BC414C"));
-    // Softeners for better matrix conditioning
-    NodeIndex nC1_soft = c.createNode("Q1_Col_soft");
-    NodeIndex nC2_soft = c.createNode("Q2_Col_soft");
-    addBjtExtended(c, nC1_soft, nINP, nE1, q_npn, false, "Q1");
-    addBjtExtended(c, nC2_soft, nINM, nE2, q_npn, false, "Q2");
-    c.addElement<Resistor>("R_Soft1", nC1_soft, nC1, 100.0);
-    c.addElement<Resistor>("R_Soft2", nC2_soft, nC2, 100.0);
+    addBjtExtended(c, nC1, nINP, nE1, q_npn, false, "Q1");
+    addBjtExtended(c, nC2, nINM, nE2, q_npn, false, "Q2");
 
     c.addElement<Resistor>("R_E1", nE1, nTAIL, 100.0);
     c.addElement<Resistor>("R_E2", nE2, nTAIL, 100.0);

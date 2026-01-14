@@ -31,6 +31,7 @@ add_library(mna_lib STATIC
     circuit.h
     spice_models_2520.h
     api_2520_builder.h
+    plausibility.h
 )
 
 # Make headers available
@@ -59,9 +60,13 @@ target_link_libraries(mna_tests_pnp_diode PRIVATE mna_lib)
 add_executable(mna_tests_bjt_extended test_bjt_extended.cpp)
 target_link_libraries(mna_tests_bjt_extended PRIVATE mna_lib)
 
+add_executable(sweep_supplies sweep_supplies.cpp)
+target_link_libraries(sweep_supplies PRIVATE mna_lib)
+
 # Add tests
 add_test(NAME circuit_tests COMMAND mna_tests)
 add_test(NAME golden_tests COMMAND mna_tests_golden)
 add_test(NAME pnp_diode_tests COMMAND mna_tests_pnp_diode)
 add_test(NAME bjt_extended_tests COMMAND mna_tests_bjt_extended)
 add_test(NAME 2520_tests COMMAND mna_tests_2520)
+add_test(NAME supply_sweep COMMAND sweep_supplies)

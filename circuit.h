@@ -126,44 +126,73 @@ public:
             system.addA(i, i, activeGmin);
           }
 
-          double maxResid = 0.0;
-          for (int i = 0; i < N; ++i) {
-            double rowSum = 0.0;
-            for (int j = 0; j < N; ++j) {
-              rowSum += system.getA(i, j) * xGuess[(std::size_t)j];
+          // Compute current residual for damping check
+          auto computeResidualNorm = [&](const std::vector<double> &sol) {
+            double norm = 0.0;
+            for (int i = 0; i < N; ++i) {
+              double rowSum = 0.0;
+              for (int j = 0; j < N; ++j) {
+                rowSum += system.getA(i, j) * sol[(std::size_t)j];
+              }
+              double fi = rowSum - system.getZ(i);
+              norm += fi * fi;
             }
-            double fi = rowSum - system.getZ(i);
-            maxResid = std::max(maxResid, std::abs(fi));
+            return std::sqrt(norm);
+          };
+
+          double oldResidNorm = computeResidualNorm(xGuess);
+
+          std::vector<double> deltaX;
+          int failRow = GaussianSolver::solve(system, deltaX);
+          if (failRow >= 0) {
+            if (verbose)
+              std::cerr << "[Circuit] Linear solver failed at row " << failRow
+                        << "\n";
+            break; // Try next Gmin
           }
 
+          // Backtracking Line Search
+          double alpha = 1.0;
           std::vector<double> xNew;
-          if (GaussianSolver::solve(system, xNew) >= 0)
-            break;
+          bool improved = false;
+
+          for (int backtrack = 0; backtrack < 5; ++backtrack) {
+            xNew = xGuess;
+            for (int i = 0; i < N; ++i) {
+              double dx =
+                  alpha * (deltaX[(std::size_t)i] - xGuess[(std::size_t)i]);
+              // Still apply a safety clamp
+              if (dx > 2.0)
+                dx = 2.0;
+              if (dx < -2.0)
+                dx = -2.0;
+              xNew[(std::size_t)i] += dx;
+            }
+
+            // Apply Limiting
+            LimitContext limitCtx{xNew, xGuess};
+            for (auto *ne : newtonElements)
+              ne->computeLimitedVoltages(limitCtx);
+
+            double newResidNorm = computeResidualNorm(xNew);
+            if (newResidNorm < oldResidNorm || alpha < 0.1) {
+              improved = true;
+              break;
+            }
+            alpha *= 0.5;
+          }
 
           double maxDelta = 0.0;
-          std::vector<double> xOld = xGuess;
-          double damping = (k > 50) ? 0.2 : (k > 20 ? 0.5 : 1.0);
-
           for (int i = 0; i < N; ++i) {
-            double delta =
-                damping * (xNew[(std::size_t)i] - xOld[(std::size_t)i]);
-            // Tighter clamp for stability: 2.0V
-            if (delta > 2.0)
-              delta = 2.0;
-            if (delta < -2.0)
-              delta = -2.0;
-            xGuess[(std::size_t)i] = xOld[(std::size_t)i] + delta;
-            maxDelta = std::max(maxDelta, std::abs(delta));
+            maxDelta = std::max(maxDelta, std::abs(xNew[i] - xGuess[i]));
           }
 
-          if (maxDelta < tol && maxResid < 1e-6) {
+          xGuess = xNew;
+
+          if (maxDelta < tol && oldResidNorm < 1e-6) {
             stepConverged = true;
             break;
           }
-
-          LimitContext limitCtx{xGuess, xOld};
-          for (auto *ne : newtonElements)
-            ne->computeLimitedVoltages(limitCtx);
         }
         if (stepConverged)
           break;

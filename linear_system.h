@@ -12,14 +12,19 @@ public:
   DenseLinearSystem() = default;
 
   void resize(int n) {
+    if (n == N)
+      return;
     N = n;
-    A.assign((std::size_t)N * (std::size_t)N, 0.0);
-    z.assign((std::size_t)N, 0.0);
+    A.resize((std::size_t)N * (std::size_t)N);
+    z.resize((std::size_t)N);
+    clear();
   }
 
   int size() const { return N; }
 
   void clear() {
+    if (A.empty())
+      return;
     std::fill(A.begin(), A.end(), 0.0);
     std::fill(z.begin(), z.end(), 0.0);
   }

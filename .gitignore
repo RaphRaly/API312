@@ -1,7 +1,22 @@
 # Binaries
 main
+audit_2520
+mna_tests_2520
+run_diagnostics
+test_bjt_mna
+test_diagnostics
+test_minimal_bjt
+test_vsource_mna
+benchmark
+sweep_supplies
+mc_test
 *.out
+*.exe
 *.app
+
+# Debug Symbols
+*.dSYM/
+*.pdb
 
 # Objects and Libraries
 *.o
@@ -9,14 +24,18 @@ main
 *.so
 *.dylib
 
-# IDEs
+# Build Directories
+build/
+bin/
+obj/
+
+# IDEs and Caches
 .vscode/
 .idea/
 *.swp
 *.swo
-
-# OS
+.cache/
 .DS_Store
 
-# Brain/Artifacts (If you want to keep them out of project git)
+# Brain/Artifacts
 #.gemini/
