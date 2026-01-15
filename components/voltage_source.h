@@ -1,0 +1,54 @@
+#pragma once
+#include "elements.h"
+#include "mna_types.h"
+#include <stdexcept>
+
+using namespace std;
+
+// Independent voltage source between a and b.
+// Adds one extra branch variable (current through the source).
+class VoltageSource : public IElement, public IBranchElement {
+public:
+  VoltageSource(NodeIndex a, NodeIndex b, double V) : na(a), nb(b), V_(V) {}
+  VoltageSource(const string & /*name*/, NodeIndex p, NodeIndex n,
+                double V)
+      : na(p), nb(n), V_(V) {}
+
+  virtual ~VoltageSource() = default;
+
+  void setVoltage(double V) { V_ = V; }
+
+  // IBranchElement
+  int branchCount() const override { return 1; }
+
+  void setBranchIndex(int firstBranchIndex) override {
+    branchIdx_ = firstBranchIndex;
+  }
+
+  void stamp(StampContext &ctx) const override {
+    if (branchIdx_ < 0)
+      throw runtime_error("VoltageSource: branchIdx not set (did you "
+                               "call Circuit::finalize?)");
+
+    const int k = branchIdx_;
+    if (na != GND) {
+      ctx.sys.addA(na, k, +1.0);
+      ctx.sys.addA(k, na, +1.0);
+    }
+    if (nb != GND) {
+      ctx.sys.addA(nb, k, -1.0);
+      ctx.sys.addA(k, nb, -1.0);
+    }
+    ctx.sys.addZ(k, V_ * ctx.scale);
+  }
+
+  void getDcConnections(
+      vector<pair<int, int>> &connections) const override {
+    connections.push_back({na, nb});
+  }
+
+protected:
+  NodeIndex na, nb;
+  double V_;
+  int branchIdx_ = -1;
+};
