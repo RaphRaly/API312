@@ -43,3 +43,19 @@ obj/
 # Brain/Artifacts
 #.gemini/
 mna_tests_pnp
+
+# Analysis and Logs
+*.txt
+*.log
+*.out
+nodes.txt
+bjt_report.txt
+bjt_analysis.txt
+solve_log.txt
+error.log
+output.log
+test_output.txt
+polarity_test.txt
+topology_analysis.txt
+nodes_full.txt
+out*.txt
