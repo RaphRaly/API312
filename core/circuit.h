@@ -142,7 +142,7 @@ public:
 
   // Attempt to find DC operating point using Pseudo-Transient (OpTran)
   // Runs transient simulation with overdamped capacitors to settle into DC
-  bool solveDcPseudoTransient(vector<double> &x, double duration = 1e-3, double dt = 1e-6) {
+  bool solveDcPseudoTransient(vector<double> &x, double duration = 1e-3, double dt = 1e-6, bool disableSourceStepping = false) {
       if (!finalized) finalize();
       
       // Initialize with nodesets if available
@@ -167,22 +167,42 @@ public:
           }
       }
       
+      // DC reset for dynamic elements before final DC solve
+      for (auto *d : dynamicElements) {
+         d->beginStep(0.0); // DC: capacitors open-circuit (G=0, Ieq=0)
+      }
+
       // Use result as guess for full DC solve
-      return solveDc(x);
+      return solveDc(x, 250, 1e-6, false, 50, nullptr, disableSourceStepping);
   }
 
   bool solveDc(vector<double> &x, int maxIters = 250, double tol = 1e-6,
                bool verbose = false, int numSteps = 50,
-               ConvergenceStats *stats = nullptr) {
+               ConvergenceStats *stats = nullptr, bool disableSourceStepping = false) {
     if (!finalized)
       finalize();
     int N = (int)system.size();
     if ((int)x.size() != N)
       x.assign((size_t)N, 0.0);
+
+    // FIX 1: Reset dynamic elements to DC mode
+    for (auto *d : dynamicElements) {
+       d->beginStep(0.0); // DC: capacitors open-circuit (G=0, Ieq=0)
+    }
       
-    // Apply Nodesets as initial guess
-    for (auto const& [node, val] : m_nodeset) {
-        if (node < (int)x.size()) x[node] = val;
+    // FIX 2: Apply Nodesets ONLY if x is truly empty/zero (don't nuke warm start)
+    // More robust check: x must be wrong size OR have max(|x[i]|) < eps
+    bool applyNodesets = ((int)x.size() != N);
+    if (!applyNodesets) {
+        double maxAbs = 0.0;
+        for (double v : x) maxAbs = max(maxAbs, abs(v));
+        applyNodesets = (maxAbs < 1e-9);
+    }
+    
+    if (applyNodesets) {
+        for (auto const& [node, val] : m_nodeset) {
+            if (node < (int)x.size()) x[node] = val;
+        }
     }
     
     vector<double> xGuess = x;
@@ -318,33 +338,41 @@ public:
     double activeGmin = 1e-7;
     int rampSteps = max(numSteps, 50);
 
-    // Try Stage 1: Source ramp
+    // Try Stage 1: Source ramp (only if not disabled)
     bool rampSuccessful = false;
-    for (int s = 0; s <= rampSteps; ++s) {
-      double scale = (double)s / rampSteps;
-      if (stats)
-        stats->sourceStepsReached = s;
-      if (!innerNewton(maxIters, scale, activeGmin, xGuess, false)) {
-        // Fallback: try with even higher Gmin
-        activeGmin = 1e-3;
-        xGuess.assign((size_t)N, 0.0);
-        bool fallbackSuccess = true;
-        for (int s2 = 0; s2 <= rampSteps; ++s2) {
-          double scale2 = (double)s2 / rampSteps;
+    
+    if (disableSourceStepping) {
+        // External homotopy controls sources via updateSources(s, ...).
+        // Skip EVERYTHING internal - no source ramp, no polish Newton.
+        // The caller's PT already did the heavy lifting. Just go to Gmin stepping.
+        rampSuccessful = true;
+    } else {
+        for (int s = 0; s <= rampSteps; ++s) {
+          double scale = (double)s / rampSteps;
           if (stats)
-            stats->sourceStepsReached = s2;
-          if (!innerNewton(maxIters, scale2, activeGmin, xGuess, false)) {
-            fallbackSuccess = false;
+            stats->sourceStepsReached = s;
+          if (!innerNewton(maxIters, scale, activeGmin, xGuess, false)) {
+            // Fallback: try with even higher Gmin
+            activeGmin = 1e-3;
+            xGuess.assign((size_t)N, 0.0);
+            bool fallbackSuccess = true;
+            for (int s2 = 0; s2 <= rampSteps; ++s2) {
+              double scale2 = (double)s2 / rampSteps;
+              if (stats)
+                stats->sourceStepsReached = s2;
+              if (!innerNewton(maxIters, scale2, activeGmin, xGuess, false)) {
+                fallbackSuccess = false;
+                break;
+              }
+            }
+            if (!fallbackSuccess)
+              return false;
+            rampSuccessful = true;
             break;
           }
+          if (s == rampSteps)
+            rampSuccessful = true;
         }
-        if (!fallbackSuccess)
-          return false;
-        rampSuccessful = true;
-        break;
-      }
-      if (s == rampSteps)
-        rampSuccessful = true;
     }
     if (!rampSuccessful)
       return false;

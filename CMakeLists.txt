@@ -93,6 +93,30 @@ target_link_libraries(debug_feedback_bias PRIVATE mna_lib)
 add_executable(test_2520_stabilized tests/test_2520_stabilized.cpp)
 target_link_libraries(test_2520_stabilized PRIVATE mna_lib)
 
+add_executable(test_2520_patron_fix tests/test_2520_patron_fix.cpp)
+target_link_libraries(test_2520_patron_fix PRIVATE mna_lib)
+
+add_executable(test_parasitic_scale tests/test_parasitic_scale.cpp)
+target_link_libraries(test_parasitic_scale PRIVATE mna_lib)
+
+add_executable(test_pnp_unit tests/test_pnp_unit.cpp)
+target_link_libraries(test_pnp_unit PRIVATE mna_lib)
+
+add_executable(kcl_audit_nC2 tests/kcl_audit_nC2.cpp)
+target_link_libraries(kcl_audit_nC2 PRIVATE mna_lib)
+
+add_executable(test_vas_bias_chain tests/test_vas_bias_chain.cpp)
+target_link_libraries(test_vas_bias_chain PRIVATE mna_lib)
+
+add_executable(test_2520_continuation tests/test_2520_continuation.cpp)
+target_link_libraries(test_2520_continuation PRIVATE mna_lib)
+
+add_executable(test_2520_homotopy2d tests/test_2520_homotopy2d.cpp)
+target_link_libraries(test_2520_homotopy2d PRIVATE mna_lib)
+
+add_executable(test_2520_homotopy_v2 tests/test_2520_homotopy_v2.cpp)
+target_link_libraries(test_2520_homotopy_v2 PRIVATE mna_lib)
+
 add_executable(diagnose_polarity diagnostics/diagnose_polarity.cpp)
 target_link_libraries(diagnose_polarity PRIVATE mna_lib)
 

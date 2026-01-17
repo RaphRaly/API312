@@ -30,6 +30,10 @@ public:
   }
 
   double getR() const { return R_; }
+  void setResistance(double R) { 
+    if (R <= 0.0) R = 1e-12;  // Clamp to tiny positive to avoid /0
+    R_ = R; 
+  }
   NodeIndex getNa() const { return na; }
   NodeIndex getNb() const { return nb; }
 
