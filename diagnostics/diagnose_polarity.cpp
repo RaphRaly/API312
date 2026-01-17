@@ -25,11 +25,11 @@ double getV(const Circuit &c, const vector<double> &x, const string &name) {
 
 void auditNode(const Circuit& c, const vector<double>& x, const string& nodeName, int targetNode) {
     if (targetNode == GND) return; // Don't audit GND
-    out << "\n--- AUDIT FOR NODE: " << nodeName << " (" << (targetNode < x.size() ? x[targetNode] : 0.0) << " V) ---" << endl;
+    out << "\n--- AUDIT FOR NODE: " << nodeName << " (" << ((size_t)targetNode < x.size() ? x[targetNode] : 0.0) << " V) ---" << endl;
     out << left << setw(20) << "Element" << setw(15) << "Type" << "Connection/Current" << endl;
     
     double totalCurrent = 0.0;
-    double nodeV = (targetNode < x.size()) ? x[targetNode] : 0.0;
+    double nodeV = ((size_t)targetNode < x.size()) ? x[targetNode] : 0.0;
     
     // Gmin Leakage
     // MUST 1: Explicit Gmin accounting
@@ -44,7 +44,7 @@ void auditNode(const Circuit& c, const vector<double>& x, const string& nodeName
         if (auto* r = dynamic_cast<Resistor*>(e.get())) {
             if (r->getNa() == targetNode || r->getNb() == targetNode) {
                 int otherNode = (r->getNa() == targetNode) ? r->getNb() : r->getNa();
-                double otherV = (otherNode == GND) ? 0.0 : ((otherNode < x.size()) ? x[otherNode] : 0.0);
+                double otherV = (otherNode == GND) ? 0.0 : (((size_t)otherNode < x.size()) ? x[otherNode] : 0.0);
                 
                 double current = (nodeV - otherV) / r->getR();
                 
@@ -98,7 +98,7 @@ void auditNode(const Circuit& c, const vector<double>& x, const string& nodeName
 int main() {
     out.open("polarity_test.txt");
     
-    auto runSim = [](double vin_val, const string& label) -> double {
+    auto runSim = [](double vin_val, const string& /*label*/) -> double {
         Circuit c;
         // ... (existing setup code is fine, will be rebuilt) ...
         double vcc_val = 15.0;
