@@ -206,6 +206,11 @@ void test_vas_bias() {
     vector<double> x;
     bool conv = c.solveDc(x);
     
+    if (!conv) {
+        cout << "FAILED: No Convergence" << endl;
+        exit(1);
+    }
+    
     cout << "V(B4) = 14.0 V" << endl;
     cout << "V(C4) (Q5 Base) = " << x[nC4] << " V" << endl;
     cout << "V(VAS_Out) = " << x[nVAS_Out] << " V" << endl;
