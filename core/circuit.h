@@ -32,7 +32,7 @@ public:
   double getFinalGmin() const { return m_finalGmin; }
 
   template <typename T, typename... Args> T &addElement(Args &&...args) {
-    auto el = make_unique<T>(forward<Args>(args)...);
+    auto el = make_unique<T>(std::forward<Args>(args)...);
     T &ref = *el;
 
     if constexpr (is_base_of<INewtonElement, T>::value) {
@@ -45,8 +45,8 @@ public:
       branchElements.push_back(dynamic_cast<IBranchElement *>(el.get()));
     }
 
-    extractName(el.get(), forward<Args>(args)...);
-    elements.push_back(move(el));
+    extractName(el.get(), std::forward<Args>(args)...);
+    elements.push_back(std::move(el));
     return ref;
   }
 
@@ -158,7 +158,7 @@ public:
       
       // Run transient
       int steps = (int)(duration / dt);
-      bool stable = true;
+      bool stable [[maybe_unused]] = true;
       for(int i=0; i<steps; ++i) {
           // Use relaxed tolerances for pseudo-transient to avoid getting stuck
           if (!step(dt, x, 10, 1e-3, 1e-6)) {
