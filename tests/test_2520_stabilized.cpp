@@ -16,7 +16,7 @@ int main() {
     Api2520Builder::build2520(c);
     
     const auto& names = c.getNodeNames();
-    NodeIndex nC4 = -1, nE5 = -1, nC2 = -1, nE4 = -1, nVAS = -1, nOUT = -1, nGND = -1;
+    NodeIndex nC4 = -1, nE5 = -1, nC2 = -1, nE4 = -1, nVAS = -1, nOUT = -1;
     NodeIndex nB_HI = -1, nB_LO = -1;
 
     for(const auto& [idx, name] : names) {
@@ -26,7 +26,7 @@ int main() {
         if (name == "Q4_Emit") nE4 = idx;
         if (name == "VAS_Col") nVAS = idx;
         if (name == "OUT") nOUT = idx;
-        if (name == "GND") nGND = idx;
+
         if (name == "VAS_High") nB_HI = idx;
         if (name == "VAS_Low") nB_LO = idx;
     }

@@ -15,7 +15,6 @@ void printKclAtNode(Circuit& c, const vector<double>& x, NodeIndex nodeIdx, cons
     cout << "\n=== KCL AUDIT AT " << name << " (Index " << nodeIdx << ") ===" << endl;
     cout << "V(" << name << ") = " << x[nodeIdx] << " V" << endl;
     
-    double residual = 0;
     // Iterate over all elements connected to this node
     // Since we don't have easy back-pointers, we reconstruct from matrix row
     // Row i represents KCL for node i: sum(Gij * Vj) + sum(Aik * Ik) = I_source
@@ -47,15 +46,13 @@ int main() {
     
     // Get named nodes
     const auto& names = c.getNodeNames();
-    NodeIndex nINM = -1, nINM_Ref = -1, nOUT = -1, nGND = -1;
-    NodeIndex nQ2_Bi = -1;
+    NodeIndex nINM = -1, nINM_Ref = -1, nOUT = -1;
     
     // Find precise indices
     for(const auto& [idx, name] : names) {
         if (name == "INM") nINM = idx;
         if (name == "INM_Ref") nINM_Ref = idx;
         if (name == "OUT") nOUT = idx;
-        if (name == "GND") nGND = idx; // Usually -1 or handles internally
     }
     
     // Add NodeHook to capture internal nodes if possible, or just search unknowns
