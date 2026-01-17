@@ -84,7 +84,9 @@ bool testQ2BaseParasitics() {
     
     double v_inm = x[nINM];
     double v_q2_bi = x[q2nodes.b_int];
-    double rx = (v_inm - v_q2_bi) / (q_npn.RB + 1e-9); // Estimate current?
+    double rx = (v_inm - v_q2_bi) / (q_npn.RB + 1e-9); 
+    (void)rx; // Use it to suppress warning or remove if truly not needed.
+    // Actually, let's print it to use it.
     
     cout << "V(INM) = " << v_inm << " V" << endl;
     cout << "V(Q2_Bi) = " << v_q2_bi << " V" << endl;
@@ -118,8 +120,7 @@ bool testBiasLoopMatrix() {
     NodeIndex nOUT = c.createNode("OUT");
     NodeIndex nE7 = c.createNode("E7");
     NodeIndex nE8 = c.createNode("E8");
-    NodeIndex nINM = c.createNode("INM");
-    NodeIndex nREF = c.createNode("INM_Ref");
+
     
     // Force inputs for loop
     // Drive C4 (Base of Q5) directly?
@@ -159,6 +160,7 @@ bool testBiasLoopMatrix() {
     
     vector<double> x;
     bool conv = c.solveDc(x);
+    if (!conv) { cout << "No Convergence" << endl; }
     
     cout << "Drive V(C4) = " << v_drive << " V" << endl;
     cout << "V(VAS) = " << x[nVAS] << " V" << endl;
