@@ -27,7 +27,6 @@ int main() {
     // Get node indices
     const auto& names = c.getNodeNames();
     NodeIndex nC2 = -1, nC1 = -1, nVCC = -1, nVEE = -1, nINM = -1;
-    NodeIndex nE9 = -1, nE2 = -1;
     
     // Also find internal nodes for Q9, Q2, Q4
     NodeIndex nQ9_Bi = -1, nQ9_Ci = -1, nQ9_Ei = -1;
@@ -40,8 +39,6 @@ int main() {
         if (name == "VCC") nVCC = idx;
         if (name == "VEE") nVEE = idx;
         if (name == "INM") nINM = idx;
-        if (name == "Q9_Emit") nE9 = idx;
-        if (name == "Q2_Emit") nE2 = idx;
         // Internal nodes
         if (name == "Q9_Bi") nQ9_Bi = idx;
         if (name == "Q9_Ci") nQ9_Ci = idx;
