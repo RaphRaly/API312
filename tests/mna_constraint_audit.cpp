@@ -166,6 +166,7 @@ void analyze_full_2520() {
     bool conv = c.solveDc(x);
     
     double finalGmin = c.getFinalGmin();
+    cout << "Converged: " << (conv ? "YES" : "NO") << endl;
     cout << "Final Gmin: " << finalGmin << " S" << endl;
     
     // Analyze Jacobian

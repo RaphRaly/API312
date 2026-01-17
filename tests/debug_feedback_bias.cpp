@@ -27,6 +27,11 @@ bool testFeedbackOnly() {
     vector<double> x;
     bool conv = c.solveDc(x);
     
+    if (!conv) {
+        cout << "FAIL: No convergence." << endl;
+        return false;
+    }
+    
     double v_inm = x[nINM];
     cout << "V(INM) = " << v_inm << " V (Expected ~0.0)" << endl;
     
