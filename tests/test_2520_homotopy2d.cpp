@@ -215,7 +215,7 @@ HomotopyResult run2DHomotopy(bool verbose = true) {
     }
     
     // Set final circuit: alpha=1, bleeder=0
-    Api2520Homotopy::updateSources(src, 1.0, 1.0, 0.0);
+    Api2520Homotopy::updateSources(src, 1.0, 1.0, BLEEDER_G_END);
     
     // Use best solution as starting point
     x = xGood;
