@@ -1,7 +1,6 @@
+#pragma once
 // Proposed improvements for circuit modeling
 // This file contains ideas for extending the simulator
-
-#pragma once
 
 /*
 FUTURE IMPROVEMENTS FOR MODELING:

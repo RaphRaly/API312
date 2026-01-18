@@ -1,3 +1,4 @@
+#pragma once
 #include "bjt_params.h"
 #include "capacitor_trap.h"
 #include "circuit.h"
@@ -58,8 +59,7 @@ public:
 
   void stamp(StampContext & /*ctx*/) const override {}
 
-  void getDcConnections(
-      vector<pair<int, int>> &connections) const override {
+  void getDcConnections(vector<pair<int, int>> &connections) const override {
     connections.push_back({nb, ne});
     connections.push_back({nb, nc});
   }
@@ -190,8 +190,7 @@ public:
 
   void stamp(StampContext & /*ctx*/) const override {}
 
-  void getDcConnections(
-      vector<pair<int, int>> &connections) const override {
+  void getDcConnections(vector<pair<int, int>> &connections) const override {
     connections.push_back({nb, ne});
     connections.push_back({nb, nc});
   }
@@ -226,11 +225,11 @@ public:
     //   Iro entering collector = go*(Vc - Ve) = -go*Vec
     //   Iro entering emitter   = go*(Ve - Vc) = +go*Vec
     const double go = (par.VAF > 0.0) ? abs(Ic_base) / par.VAF : 0.0;
-    const double Ic = Ic_base - go * Vec;  // FIX: ro current into C
+    const double Ic = Ic_base - go * Vec; // FIX: ro current into C
 
     // Currents entering terminals (Ie includes ro current)
-    const double Ie = I_tran + I_eb_diode + go * Vec;  // FIX: ro current into E
-    const double Ib = -(Ie + Ic);  // go terms cancel, base current unchanged
+    const double Ie = I_tran + I_eb_diode + go * Vec; // FIX: ro current into E
+    const double Ib = -(Ie + Ic); // go terms cancel, base current unchanged
 
     const double g_tran_f = (par.Is / par.nVt) * expEB;
     const double g_tran_r = (par.Is / par.nVt) * expCB;
@@ -241,14 +240,14 @@ public:
     // Veb = Ve - Vb, Vcb = Vc - Vb, Vec = Ve - Vc
     // dVec/dVe = +1, dVec/dVc = -1, dVec/dVb = 0
     // Ie row (includes +go*Vec, so dIe/dVe += go, dIe/dVc -= go)
-    const double dIe_dVe = g_tran_f + g_eb + go;   // FIX: +go from dVec/dVe = +1
-    const double dIe_dVc = -g_tran_r - go;         // FIX: -go from dVec/dVc = -1
-    const double dIe_dVb = -(g_tran_f + g_eb - g_tran_r);  // unchanged
+    const double dIe_dVe = g_tran_f + g_eb + go; // FIX: +go from dVec/dVe = +1
+    const double dIe_dVc = -g_tran_r - go;       // FIX: -go from dVec/dVc = -1
+    const double dIe_dVb = -(g_tran_f + g_eb - g_tran_r); // unchanged
 
     // Ic row (includes -go*Vec, so dIc/dVe -= go, dIc/dVc += go)
-    const double dIc_dVe = -g_tran_f - go;         // FIX: -go from -go*dVec/dVe
-    const double dIc_dVc = g_tran_r + g_cb + go;   // FIX: +go from -go*dVec/dVc
-    const double dIc_dVb = g_tran_f - (g_tran_r + g_cb);  // unchanged
+    const double dIc_dVe = -g_tran_f - go;       // FIX: -go from -go*dVec/dVe
+    const double dIc_dVc = g_tran_r + g_cb + go; // FIX: +go from -go*dVec/dVc
+    const double dIc_dVb = g_tran_f - (g_tran_r + g_cb); // unchanged
 
     // Ib row (derived from Ib = -(Ie + Ic))
     const double dIb_dVe = -(dIe_dVe + dIc_dVe);
@@ -256,8 +255,10 @@ public:
     const double dIb_dVb = -(dIe_dVb + dIc_dVb);
 
     // RHS contributions (JV = J * V_op)
-    const double JV_Ie = (g_tran_f + g_eb) * Veb + (-g_tran_r) * Vcb + go * Vec;  // FIX: +go*Vec
-    const double JV_Ic = (-g_tran_f) * Veb + (g_tran_r + g_cb) * Vcb - go * Vec;  // FIX: -go*Vec
+    const double JV_Ie =
+        (g_tran_f + g_eb) * Veb + (-g_tran_r) * Vcb + go * Vec; // FIX: +go*Vec
+    const double JV_Ic =
+        (-g_tran_f) * Veb + (g_tran_r + g_cb) * Vcb - go * Vec; // FIX: -go*Vec
     const double JV_Ib = -(JV_Ie + JV_Ic);
 
     auto stampRow = [&](int row, double I_op, double d_dVc, double d_dVb,
