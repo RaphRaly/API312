@@ -15,8 +15,7 @@ bool checkTransistorConditions(const vector<double> &x, int /*numNodes*/) {
 
     // Check for NaN or infinite values
     if (!isfinite(v)) {
-      cout << "ERROR: Non-finite voltage at node " << i << ": " << v
-                << endl;
+      cout << "ERROR: Non-finite voltage at node " << i << ": " << v << endl;
       all_ok = false;
       continue;
     }
@@ -24,14 +23,14 @@ bool checkTransistorConditions(const vector<double> &x, int /*numNodes*/) {
     // Check for unreasonably large voltages (beyond supply rails)
     if (abs(v) > 20.0) {
       cout << "WARNING: Large voltage at node " << i << ": " << v
-                << "V (beyond ±20V)" << endl;
+           << "V (beyond ±20V)" << endl;
       all_ok = false;
     }
 
     // Check for negative voltages that are too negative (beyond VEE)
     if (v < -18.0) {
-      cout << "WARNING: Very negative voltage at node " << i << ": " << v
-                << "V" << endl;
+      cout << "WARNING: Very negative voltage at node " << i << ": " << v << "V"
+           << endl;
       all_ok = false;
     }
   }
@@ -46,16 +45,18 @@ bool test2520DcOperatingPoint() {
   Api2520Builder::build2520(c);
 
   vector<double> x;
-  ConvergenceStats stats;
 
-  if (!c.solveDc(x, 200, 1e-9, true, 50, &stats)) {
-    cout << "DC solve failed after " << stats.totalIterations
-              << " iterations" << endl;
+  // Use pseudo-transient continuation for robust DC solve
+  // This follows a physical trajectory avoiding latch basins
+  if (!c.solveDcPseudoTransient(x, 1e-3, 1e-6,
+                                true)) { // disableSourceStepping=true
+    cout << "DC solve failed" << endl;
     return false;
   }
+  double finalGmin = c.getFinalGmin();
 
-  cout << "DC convergence achieved in " << stats.totalIterations
-            << " total iterations" << endl;
+  cout << "DC convergence achieved (Gmin=" << scientific << finalGmin << ")"
+       << endl;
 
   // Check basic operating conditions
   NodeIndex out_node = Api2520Builder::getOutputNode();
@@ -64,12 +65,12 @@ bool test2520DcOperatingPoint() {
   // Output should be near 0V for balanced inputs (allow reasonable offset)
   if (abs(vout) > 2.0) {
     cout << "Output offset too large: " << vout << "V (should be near 0V)"
-              << endl;
+         << endl;
     return false;
   }
 
-  cout << "Output voltage: " << fixed << setprecision(3) << vout
-            << "V ✓" << endl;
+  cout << "Output voltage: " << fixed << setprecision(3) << vout << "V ✓"
+       << endl;
 
   // Check that supplies are at correct voltages (±15V)
   // Note: We can't easily check internal node voltages without named node
@@ -87,8 +88,7 @@ bool test2520DcOperatingPoint() {
 }
 
 bool test2520InputOffset() {
-  cout << "Testing 2520 Input Offset and Basic Functionality..."
-            << endl;
+  cout << "Testing 2520 Input Offset and Basic Functionality..." << endl;
 
   Circuit c;
   Api2520Builder::build2520(c);
@@ -103,19 +103,20 @@ bool test2520InputOffset() {
   vinP->setVoltage(0.0);
   vinM->setVoltage(0.0);
 
-  if (!c.solveDc(x, 100, 1e-9, true, 50)) {
+  // Use PT for initial solve to find correct DC point (avoids latch)
+  if (!c.solveDcPseudoTransient(x, 1e-3, 1e-6, true)) {
     cout << "Balanced input solve failed" << endl;
     return false;
   }
 
   double vout_balanced = x[out_node];
-  cout << "Balanced output: " << fixed << setprecision(6)
-            << vout_balanced << "V" << endl;
+  cout << "Balanced output: " << fixed << setprecision(6) << vout_balanced
+       << "V" << endl;
 
   // Check that output is reasonably close to 0V
   if (abs(vout_balanced) > 2.0) { // Relaxed for Early effect
-    cout << "Output offset too large with balanced inputs: "
-              << vout_balanced << "V" << endl;
+    cout << "Output offset too large with balanced inputs: " << vout_balanced
+         << "V" << endl;
     return false;
   }
 
@@ -130,7 +131,7 @@ bool test2520InputOffset() {
 
   double vout_diff = x[out_node];
   cout << "Differential output (1mV differential in): " << fixed
-            << setprecision(6) << vout_diff << "V" << endl;
+       << setprecision(6) << vout_diff << "V" << endl;
 
   // Check that the circuit responds to input (basic functionality)
   if (abs(vout_diff - vout_balanced) <
@@ -141,8 +142,7 @@ bool test2520InputOffset() {
 
   // Check operating conditions with differential input
   if (!checkTransistorConditions(x, c.getNumNodes())) {
-    cout << "Abnormal operating conditions with differential input"
-              << endl;
+    cout << "Abnormal operating conditions with differential input" << endl;
     return false;
   }
 
@@ -161,11 +161,10 @@ int main() {
 
   if (all_passed) {
     cout << "\n🎉 All 2520 tests PASSED! Ready for schematic refinement."
-              << endl;
+         << endl;
     return 0;
   } else {
-    cout << "\n❌ Some 2520 tests FAILED. Need schematic corrections."
-              << endl;
+    cout << "\n❌ Some 2520 tests FAILED. Need schematic corrections." << endl;
     return 1;
   }
 }

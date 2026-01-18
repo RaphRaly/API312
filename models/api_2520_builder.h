@@ -55,11 +55,12 @@ public:
     // Standard inverting feedback configuration
     c.addElement<Resistor>("R_Feedback", nOUT, nINM, 10000.0);
     c.addElement<Resistor>("R_Input", nINM, nINM_Ref, 10000.0);
-    
+
     // Symmetrical bias resistors for DC stability
     // These provide DC paths without unbalancing the diff pair
     c.addElement<Resistor>("R_INP_Bias", nINP, nGND, 10.0e6); // 10MΩ to GND
-    c.addElement<Resistor>("R_INM_Ref_Bias", nINM_Ref, nGND, 10.0e6); // 10MΩ to GND
+    c.addElement<Resistor>("R_INM_Ref_Bias", nINM_Ref, nGND,
+                           10.0e6); // 10MΩ to GND
 
     // ----- SIGNAL MIRROR (Active Load) -----
     auto q_pnp = spiceToBjtParams(getSpiceBjtModel("BC416C"));
@@ -111,14 +112,18 @@ public:
 
     c.addElement<Resistor>("R_Load", nOUT, nGND, 10000.0);
 
+    // === ANTI-LATCH STABILIZERS REMOVED ===
+    // Relying on solveDcPseudoTransient() instead of circuit modification.
+
     // NODESETS: Guide Newton to the correct DC operating point
     // Without these, the solver may converge to a saturated/cutoff state
-    c.setNodeset(nOUT, 0.0);           // Output should be near 0V
-    c.setNodeset(nC1, vcc_val - 1.0);  // Q1/Q2 collectors near VCC-1V (mirror active)
-    c.setNodeset(nC2, vcc_val - 1.0);  
-    c.setNodeset(nVAS, 0.0);           // VAS output near 0V
-    c.setNodeset(nB_HI, 0.5);          // Output stage bias ~0.5V above output
-    c.setNodeset(nB_LO, -0.5);         // Output stage bias ~0.5V below output
+    c.setNodeset(nOUT, 0.0); // Output should be near 0V
+    c.setNodeset(nC1,
+                 vcc_val - 1.0); // Q1/Q2 collectors near VCC-1V (mirror active)
+    c.setNodeset(nC2, vcc_val - 1.0);
+    c.setNodeset(nVAS, 0.0);   // VAS output near 0V
+    c.setNodeset(nB_HI, 0.5);  // Output stage bias ~0.5V above output
+    c.setNodeset(nB_LO, -0.5); // Output stage bias ~0.5V below output
 
     cout << "2520 built (Step D: Final Parasitics & Tuning)" << endl;
   }

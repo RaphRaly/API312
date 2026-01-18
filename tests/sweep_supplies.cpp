@@ -19,8 +19,11 @@ int main() {
     Api2520Builder::build2520(c, v);
     c.finalize();
 
-    // Use previous x as guess if available
-    bool converged = c.solveDc(x, 400, 1e-6, !x.empty(), 50);
+    // Use pseudo-transient continuation for robust DC solve each step
+    // disableSourceStepping=true to solve purely by transient settling
+    // Don't use warm-start for PT because previous DC point might be in a
+    // different basin
+    bool converged = c.solveDcPseudoTransient(x, 1e-3, 1e-6, true);
 
     if (!converged) {
       cout << "FATAL: DC Convergence Failure at +/-" << v << "V\n";
